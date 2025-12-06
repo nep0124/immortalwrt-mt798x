@@ -35,7 +35,7 @@ jobs:
 
       # 4. 下载hanwcfk源码
       - name: 克隆hanwcfk源码
-        run: git clone https://github.com/nep0124/openwrt-personal.git openwrt
+        run: git clone https://github.com/hanwckf/immortalwrt-mt798x.git openwrt
 
       # 5. 导入精简.config并补全依赖
       - name: 配置编译选项
