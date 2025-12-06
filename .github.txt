@@ -1,0 +1,61 @@
+name: 小米AX3000T V1 精简编译hanwcfk固件
+on:
+  push:
+    branches: [ main ]  # 推送代码触发
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai  # 时区配置
+
+    steps:
+      # 1. 拉取仓库代码（含精简.config）
+      - name: 拉取代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # 2. 缓存依赖包（核心优化，加速编译）
+      - name: 缓存openwrt依赖
+        uses: actions/cache@v4
+        with:
+          path: openwrt/dl  # 缓存依赖包目录
+          key: ${{ runner.os }}-ax3000t-dl-${{ hashFiles('.config') }}  # 按配置文件哈希缓存
+          restore-keys: ${{ runner.os }}-ax3000t-dl-  # 缓存回退
+
+      # 3. 安装编译依赖（精简必要工具）
+      - name: 安装依赖
+        run: |
+          sudo apt update && sudo apt install -y \
+            build-essential gcc g++ make git wget curl \
+            libncurses5-dev libz-dev patch flex bison \
+            libssl-dev libelf-dev python3
+
+      # 4. 下载hanwcfk源码
+      - name: 克隆hanwcfk源码
+        run: git clone https://github.com/hanwckf/openwrt-personal.git openwrt
+
+      # 5. 导入精简.config并补全依赖
+      - name: 配置编译选项
+        run: |
+          cd openwrt
+          cp ../.config .  # 读取仓库根目录的精简.config
+          ./scripts/feeds update -a && ./scripts/feeds install -a
+          make defconfig  # 自动补全依赖
+
+      # 6. 编译固件（限制2线程，避免内存不足）
+      - name: 开始编译
+        run: |
+          cd openwrt
+          make -j2 V=s  # 精简线程，显示编译日志
+        timeout-minutes: 180  # 3小时超时保护
+
+      # 7. 上传编译产物
+      - name: 上传固件
+        uses: actions/upload-artifact@v4
+        with:
+          name: ax3000t-hanwcfk-firmware
+          path: openwrt/bin/targets/mediatek/mt7981/*.bin  # 仅上传固件文件
+          retention-days: 7  # 产物保留7天
